@@ -18,22 +18,20 @@ app.get('/', (req, res) => {
 // Proxy endpoint for Prospeo API
 app.post('/api/email-finder', async (req, res) => {
   const { first_name, last_name, company } = req.body;
-  
-  // Use the integrated API key
-  const api_key = 'e89cd25c23ea559352eb96d0bc2c4c68';
+  const apiKey = process.env.PROSPEO_KEY || 'e89cd25c23ea559352eb96d0bc2c4c68'; // Use env var or fallback
 
   if (!company) {
     return res.status(400).json({ error: 'Company field is required' });
   }
 
   try {
-    console.log(`Processing request for: ${first_name} ${last_name} at ${company}`);
+    console.log(`Processing request for: ${first_name || ''} ${last_name || ''} at ${company}`);
     
     const response = await fetch('https://api.prospeo.io/email-finder', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-KEY': api_key
+        'X-KEY': apiKey
       },
       body: JSON.stringify({ 
         first_name: first_name || '', 
@@ -42,13 +40,20 @@ app.post('/api/email-finder', async (req, res) => {
       })
     });
 
+    const text = await response.text(); // Get raw response
+    console.log(`Raw API response for ${first_name || ''} ${last_name || ''}: ${text.substring(0, 100)}...`);
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}, response: ${text}`);
     }
 
-    const data = await response.text();
-    console.log(`API response received for ${first_name} ${last_name}`);
-    
+    let data;
+    try {
+      data = JSON.parse(text); // Attempt to parse as JSON
+    } catch (e) {
+      throw new Error(`Invalid JSON response: ${text.substring(0, 100)}...`);
+    }
+
     res.set('Content-Type', 'application/json');
     res.send(data);
   } catch (error) {
