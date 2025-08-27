@@ -17,11 +17,10 @@ app.get('/', (req, res) => {
 
 // Proxy endpoint for Prospeo API
 app.post('/api/email-finder', async (req, res) => {
-  const { first_name, last_name, company, api_key } = req.body;
+  const { first_name, last_name, company } = req.body;
   
-  if (!api_key) {
-    return res.status(400).json({ error: 'API key is required' });
-  }
+  // Use the integrated API key
+  const api_key = 'e89cd25c23ea559352eb96d0bc2c4c68';
 
   if (!company) {
     return res.status(400).json({ error: 'Company field is required' });
