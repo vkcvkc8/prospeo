@@ -1,17 +1,19 @@
 {
   "name": "prospeo-email-finder",
   "version": "1.0.0",
-  "description": "Prospeo Email Finder Tool - Frontend",
-  "type": "module",
+  "description": "Full-stack Prospeo Email Finder Tool",
+  "main": "server.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'No specific build step required for this project.'"
   },
   "dependencies": {
-    "papaparse": "^5.4.1"
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.7",
+    "cors": "^2.8.5"
   },
-  "devDependencies": {
-    "vite": "^5.0.0"
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
