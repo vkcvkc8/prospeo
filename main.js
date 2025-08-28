@@ -15,8 +15,11 @@ async function fetchEmail(firstName, lastName, company) {
     return null;
   }
 
-  // For production deployment, we'll call Prospeo API directly with CORS handling
-  const url = 'https://api.prospeo.io/email-finder';
+  // Use a CORS proxy service to handle the API call
+  const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+  const targetUrl = 'https://api.prospeo.io/email-finder';
+  const url = proxyUrl + targetUrl;
+  
   const data = {
     first_name: firstName || '',
     last_name: lastName || '',
@@ -30,20 +33,64 @@ async function fetchEmail(firstName, lastName, company) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-KEY': PROSPEO_API_KEY
+        'X-KEY': PROSPEO_API_KEY,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(data)
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      logMessage(`❌ HTTP error ${response.status}: ${errorText}`, "error");
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
     }
 
-    const result = await response.text();
+    const result = await response.json();
     logMessage(`✅ API request successful for ${firstName} ${lastName}`, "success");
-    return result;
+    return JSON.stringify(result);
   } catch (error) {
     logMessage(`❌ Fetch error: ${error.message}`, "error");
+    
+    // If CORS proxy fails, try alternative approach
+    if (error.message.includes('cors') || error.message.includes('CORS')) {
+      logMessage("🔄 Trying alternative API approach...", "info");
+      return await tryAlternativeAPI(firstName, lastName, company);
+    }
+    
+    return null;
+  }
+}
+
+// Alternative API approach using a different method
+async function tryAlternativeAPI(firstName, lastName, company) {
+  try {
+    // Try direct API call with different headers
+    const response = await fetch('https://api.prospeo.io/email-finder', {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-KEY': PROSPEO_API_KEY,
+        'Accept': 'application/json',
+        'Origin': window.location.origin
+      },
+      body: JSON.stringify({
+        first_name: firstName || '',
+        last_name: lastName || '',
+        company: company
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      logMessage(`✅ Alternative API successful`, "success");
+      return JSON.stringify(result);
+    } else {
+      logMessage(`❌ Alternative API failed: ${response.status}`, "error");
+      return null;
+    }
+  } catch (error) {
+    logMessage(`❌ Alternative API error: ${error.message}`, "error");
     return null;
   }
 }

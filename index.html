@@ -428,11 +428,34 @@
 
     <div class="log-section">
       <h3>📝 Processing Logs</h3>
-      <div id="log">Welcome to Prospeo Email Finder! 🎉<br>Ready to find professional email addresses.<br><br>Instructions:<br>1. For single search: Enter name and company, click "Search Single"<br>2. For bulk search: Click "Search Bulk" to upload CSV file<br>3. Export results when done<br><br>Let's get started! 🚀</div>
+      <div id="log">Welcome to Prospeo Email Finder! 🎉<br>Ready to find professional email addresses.<br><br>Instructions:<br>1. For single search: Enter name and company, click "Search Single"<br>2. For bulk search: Click "Search Bulk" to upload CSV file<br>3. Export results when done<br><br>⚠️ Note: If you see CORS errors, the app will try alternative methods automatically.<br><br>Let's get started! 🚀</div>
     </div>
   </div>
 
   <script>
+  
+  <!-- Fallback script for testing API connectivity -->
+  <script>
+    // Test API connectivity on page load
+    window.addEventListener('load', function() {
+      setTimeout(() => {
+        fetch('https://api.prospeo.io/email-finder', {
+          method: 'OPTIONS',
+          headers: {
+            'X-KEY': 'e89cd25c23ea559352eb96d0bc2c4c68'
+          }
+        }).then(response => {
+          if (response.ok) {
+            console.log('✅ API connectivity test passed');
+          } else {
+            console.log('⚠️ API connectivity test failed - CORS proxy will be used');
+          }
+        }).catch(error => {
+          console.log('⚠️ API connectivity test failed - CORS proxy will be used');
+        });
+      }, 1000);
+    });
+  </script>
     // Integrated API key - no need to enter manually
     const PROSPEO_API_KEY = 'e89cd25c23ea559352eb96d0bc2c4c68';
     
