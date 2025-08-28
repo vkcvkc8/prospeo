@@ -45,6 +45,74 @@
       font-size: 1.1rem;
     }
 
+    .alert {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border-left: 4px solid;
+    }
+
+    .alert-success {
+      background: #f0fff4;
+      border-color: #38a169;
+      color: #2f855a;
+    }
+
+    .alert-error {
+      background: #fed7d7;
+      border-color: #e53e3e;
+      color: #c53030;
+    }
+
+    .alert-info {
+      background: #ebf8ff;
+      border-color: #3182ce;
+      color: #2c5282;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .stat-card {
+      background: #f7fafc;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      border: 2px solid #e2e8f0;
+    }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      color: #718096;
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
     .form-section {
       display: grid;
       gap: 20px;
@@ -218,6 +286,8 @@
       <p>Find professional email addresses from CSV data with advanced processing</p>
     </div>
 
+    <div id="alertContainer"></div>
+
     <div class="form-section">
       <div class="input-group">
         <label for="apiKeyInput">Prospeo API Key</label>
@@ -242,6 +312,30 @@
         </button>
         <button class="btn-secondary" onclick="clearLogs()">🧹 Clear Logs</button>
       </div>
+
+      <div id="progressSection" style="display: none;">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="processedCount">0</div>
+            <div class="stat-label">Processed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="foundCount">0</div>
+            <div class="stat-label">Emails Found</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="remainingCount">0</div>
+            <div class="stat-label">Remaining</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="estimatedTime">0m</div>
+            <div class="stat-label">Est. Time Left</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="log-section">
@@ -257,23 +351,72 @@
 
   <script>
     let isProcessing = false;
+    let processedCount = 0;
+    let foundCount = 0;
+    let totalCount = 0;
 
+    function showAlert(message, type = 'info') {
+      const alertContainer = document.getElementById('alertContainer');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.innerHTML = `
+        <strong>${type === 'error' ? '❌ Error:' : type === 'success' ? '✅ Success:' : 'ℹ️ Info:'}</strong> ${message}
+        <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; font-size: 18px; cursor: pointer;">&times;</button>
+      `;
+      alertContainer.appendChild(alert);
+      
+      // Auto-remove after 5 seconds for non-error messages
+      if (type !== 'error') {
+        setTimeout(() => {
+          if (alert.parentElement) {
+            alert.remove();
+          }
+        }, 5000);
+      }
+    }
+
+    function updateProgress(processed, total, found) {
+      processedCount = processed;
+      foundCount = found;
+      totalCount = total;
+      
+      const progressFill = document.getElementById('progressFill');
+      const processedCountEl = document.getElementById('processedCount');
+      const foundCountEl = document.getElementById('foundCount');
+      const remainingCountEl = document.getElementById('remainingCount');
+      const estimatedTimeEl = document.getElementById('estimatedTime');
+      
+      const percentage = (processed / total) * 100;
+      progressFill.style.width = `${percentage}%`;
+      
+      processedCountEl.textContent = processed;
+      foundCountEl.textContent = found;
+      remainingCountEl.textContent = total - processed;
+      
+      // Calculate estimated time (1.5 seconds per request)
+      const remainingRequests = total - processed;
+      const estimatedSeconds = remainingRequests * 1.5;
+      const estimatedMinutes = Math.ceil(estimatedSeconds / 60);
+      estimatedTimeEl.textContent = `${estimatedMinutes}m`;
+    }
     async function fetchEmail(firstName, lastName, company, apiKey) {
       if (!apiKey) {
         logMessage("❌ Error: API key is missing", "error");
+        showAlert("API key is missing", "error");
         return null;
       }
       if (!company) {
         logMessage("❌ Error: Company field is required", "error");
+        showAlert("Company field is required", "error");
         return null;
       }
 
-      const url = '/api/email-finder';
-      const data = {
+      // Try direct API call with proper CORS handling
+      const url = 'https://api.prospeo.io/email-finder';
+      const requestData = {
         first_name: firstName || '',
         last_name: lastName || '',
-        company: company,
-        api_key: apiKey
+        company: company
       };
 
       try {
@@ -282,21 +425,34 @@
         const response = await fetch(url, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-KEY': apiKey,
+            'Accept': 'application/json'
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            // If we can't parse error response, use status message
+          }
+          throw new Error(errorMessage);
         }
 
-        const result = await response.text();
+        const result = await response.json();
         logMessage(`✅ API request successful for ${firstName} ${lastName}`, "success");
-        return result;
+        return JSON.stringify(result);
       } catch (error) {
         logMessage(`❌ Fetch error: ${error.message}`, "error");
+        
+        // If CORS error, show helpful message
+        if (error.message.includes('CORS') || error.message.includes('fetch')) {
+          showAlert("CORS error detected. The browser is blocking direct API calls. Consider using a proxy server for production.", "error");
+        }
         return null;
       }
     }
@@ -331,15 +487,18 @@
       const apiKey = document.getElementById('apiKeyInput').value.trim();
       if (!apiKey) {
         logMessage("❌ Please enter your API key first", "error");
+        showAlert("Please enter your API key first", "error");
         return;
       }
 
       setButtonLoading('testBtn', 'testBtnText', true, 'Testing...');
       logMessage("🧪 Testing API key with sample data...", "info");
+      showAlert("Testing API connection...", "info");
       
       const response = await fetchEmail('John', 'Doe', 'intercom.com', apiKey);
       if (response) {
         logMessage("🎉 API test successful! Your key is working.", "success");
+        showAlert("API test successful! Your key is working.", "success");
         try {
           const jsonResponse = JSON.parse(response);
           if (jsonResponse.response?.email) {
@@ -350,6 +509,7 @@
         }
       } else {
         logMessage("❌ API test failed. Please check your API key.", "error");
+        showAlert("API test failed. Please check your API key and internet connection.", "error");
       }
       
       updateLastResponse(response);
@@ -364,29 +524,36 @@
       
       if (!apiKey) {
         logMessage("❌ Please enter your API key first", "error");
+        showAlert("Please enter your API key first", "error");
         return;
       }
       
       if (!fileInput.files.length) {
         logMessage("❌ Please upload a CSV file", "error");
+        showAlert("Please upload a CSV file", "error");
         return;
       }
 
       isProcessing = true;
       setButtonLoading('processBtn', 'processBtnText', true, 'Processing...');
+      document.getElementById('progressSection').style.display = 'block';
       
       const file = fileInput.files[0];
       logMessage(`📁 Starting to process file: ${file.name}`, "info");
+      showAlert(`Starting to process ${file.name}`, "info");
       
       Papa.parse(file, {
         header: true,
         complete: async function(results) {
           const validRows = results.data.filter(row => row.company && row.company.trim());
+          totalCount = validRows.length;
           logMessage(`📊 Found ${validRows.length} valid rows to process`, "info");
           logMessage(`⏱️ Estimated time: ${Math.ceil(validRows.length * 1.5 / 60)} minutes`, "info");
+          showAlert(`Found ${validRows.length} valid rows. Processing will take approximately ${Math.ceil(validRows.length * 1.5 / 60)} minutes.`, "info");
           
           const enrichedData = [];
           let processed = 0;
+          let found = 0;
           
           for (const row of validRows) {
             const { first_name, last_name, company } = row;
@@ -407,6 +574,7 @@
                 };
                 
                 if (jsonResponse.response?.email) {
+                  found++;
                   logMessage(`✅ Found: ${jsonResponse.response.email}`, "success");
                 } else {
                   logMessage(`❌ No email found for ${first_name} ${last_name}`, "error");
@@ -418,6 +586,7 @@
             
             enrichedData.push(enrichedRow);
             updateLastResponse(response);
+            updateProgress(processed, validRows.length, found);
             
             // Rate limiting - wait 1.5 seconds between requests
             if (processed < validRows.length) {
@@ -429,17 +598,22 @@
           if (enrichedData.length > 0) {
             downloadCSV(enrichedData);
             logMessage(`🎉 Processing complete! Downloaded ${enrichedData.length} enriched records`, "success");
+            showAlert(`Processing complete! Found ${found} emails out of ${processed} records. File downloaded successfully.`, "success");
           } else {
             logMessage("❌ No data to download", "error");
+            showAlert("No data to download", "error");
           }
           
           isProcessing = false;
           setButtonLoading('processBtn', 'processBtnText', false, '🚀 Process CSV');
+          document.getElementById('progressSection').style.display = 'none';
         },
         error: function(error) {
           logMessage(`❌ CSV parsing error: ${error.message}`, "error");
+          showAlert(`CSV parsing error: ${error.message}`, "error");
           isProcessing = false;
           setButtonLoading('processBtn', 'processBtnText', false, '🚀 Process CSV');
+          document.getElementById('progressSection').style.display = 'none';
         }
       });
     }
@@ -460,12 +634,14 @@
         logMessage("📥 Enriched CSV file downloaded successfully!", "success");
       } catch (error) {
         logMessage(`❌ Download error: ${error.message}`, "error");
+        showAlert(`Download error: ${error.message}`, "error");
       }
     }
 
     function clearLogs() {
       document.getElementById('log').innerHTML = 'Logs cleared. Ready for new processing! 🚀<br>';
       document.getElementById('lastResponse').textContent = 'No recent responses';
+      document.getElementById('alertContainer').innerHTML = '';
     }
 
     function setButtonLoading(btnId, textId, loading, text) {
@@ -483,6 +659,7 @@
     // Auto-focus on API key input
     document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('apiKeyInput').focus();
+      showAlert("Welcome! Please enter your Prospeo API key and test the connection before processing CSV files.", "info");
     });
   </script>
 </body>
